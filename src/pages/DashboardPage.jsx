@@ -33,16 +33,20 @@ function DashboardPage() {
   const [apiError, setApiError] = useState("");
   const [notice, setNotice] = useState("");
 
-  const fetchTasks = async () => {
+  const fetchTasks = async ({ showLoader = true } = {}) => {
     try {
-      setIsLoadingTasks(true);
+      if (showLoader) {
+        setIsLoadingTasks(true);
+      }
       const response = await getTasks();
-      setTasks(response.data);
+      setTasks(response.data || []);
       setApiError("");
     } catch (error) {
       setApiError(error.response?.data?.message || "Could not load tasks");
     } finally {
-      setIsLoadingTasks(false);
+      if (showLoader) {
+        setIsLoadingTasks(false);
+      }
     }
   };
 
@@ -74,10 +78,17 @@ function DashboardPage() {
 
     try {
       setIsMutating(true);
-      await createTask(formData);
+      const response = await createTask(formData);
+      const newTask = response.data;
+
+      if (newTask) {
+        setTasks((prev) => [newTask, ...prev]);
+      } else {
+        await fetchTasks({ showLoader: false });
+      }
+
       setFormData({ title: "", description: "" });
       setNotice("Task added successfully");
-      await fetchTasks();
     } catch (error) {
       setApiError(error.response?.data?.message || "Unable to create task");
     } finally {
@@ -88,9 +99,16 @@ function DashboardPage() {
   const handleToggleTask = async (task) => {
     try {
       setIsMutating(true);
-      await updateTask(task._id, { completed: !task.completed });
+      const response = await updateTask(task._id, { completed: !task.completed });
+      const updatedTask = response.data;
+
+      if (updatedTask) {
+        setTasks((prev) => prev.map((item) => (item._id === task._id ? updatedTask : item)));
+      } else {
+        await fetchTasks({ showLoader: false });
+      }
+
       setNotice(task.completed ? "Task moved to pending" : "Task completed");
-      await fetchTasks();
     } catch (error) {
       setApiError(error.response?.data?.message || "Unable to update task");
     } finally {
@@ -101,9 +119,16 @@ function DashboardPage() {
   const handleUpdateTask = async (taskId, payload) => {
     try {
       setIsMutating(true);
-      await updateTask(taskId, payload);
+      const response = await updateTask(taskId, payload);
+      const updatedTask = response.data;
+
+      if (updatedTask) {
+        setTasks((prev) => prev.map((item) => (item._id === taskId ? updatedTask : item)));
+      } else {
+        await fetchTasks({ showLoader: false });
+      }
+
       setNotice("Task updated");
-      await fetchTasks();
     } catch (error) {
       setApiError(error.response?.data?.message || "Unable to save changes");
     } finally {
@@ -118,8 +143,8 @@ function DashboardPage() {
     try {
       setIsMutating(true);
       await deleteTask(taskId);
+      setTasks((prev) => prev.filter((item) => item._id !== taskId));
       setNotice("Task deleted");
-      await fetchTasks();
     } catch (error) {
       setApiError(error.response?.data?.message || "Unable to delete task");
     } finally {
